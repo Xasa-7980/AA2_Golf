@@ -1,3 +1,4 @@
+using Unity.VisualScripting;
 using UnityEngine;
 
 public enum PhysicsBodyType
@@ -27,6 +28,7 @@ public class PhysicsBody : MonoBehaviour
 
     void Update ( )
     {
+        if (isStatic) return;
         DetectSurface();
         ApplyForces();
         Move();
@@ -39,7 +41,7 @@ public class PhysicsBody : MonoBehaviour
         if (isGrounded)
         {
             // pendiente
-            Vector3 gravityForce = PhysicsManager.ProjectGravityOnPlane(surfaceNormal);
+            Vector3 gravityForce = PhysicsManager.ReturnGravityOnAngledSurface(surfaceNormal);
             velocity += gravityForce * Time.deltaTime;
         }
         else
@@ -81,7 +83,7 @@ public class PhysicsBody : MonoBehaviour
         if (velocity.magnitude > 0.01f && isGrounded)
         {
             Vector3 axis = Vector3.Cross(Vector3.up, velocity.normalized);
-            float angularSpeed = velocity.magnitude / radius;
+            float angularSpeed = velocity.magnitude / radius; // w = v / r
 
             transform.Rotate(axis, angularSpeed * Mathf.Rad2Deg * Time.deltaTime, Space.World);
         }
@@ -97,9 +99,12 @@ public class PhysicsBody : MonoBehaviour
             isGrounded = true;
             surfaceNormal = hit.normal;
 
-            if (hit.collider.TryGetComponent(out PhysicsObject surface))
+            if (hit.collider.gameObject.layer.Equals(0))
             {
-                currentSurface = surface.material;
+                if(hit.collider.TryGetComponent<PhysicsBody>(out PhysicsBody surface))
+                {
+                    currentSurface = surface.material;
+                }
             }
         }
         else

@@ -8,7 +8,7 @@ public static class PhysicsManager
     {
         if (velocity.magnitude < 0.01f) return Vector3.zero;
 
-        return -velocity.normalized * friction * gravity;
+        return -velocity.normalized * friction;
     }
 
     public static Vector3 CalculateAirResistance ( Vector3 velocity, float density, float drag, float area )
@@ -29,11 +29,12 @@ public static class PhysicsManager
         return Mathf.Sqrt(b1 * b2);
     }
 
-    // clave para pendientes
-    public static Vector3 ProjectGravityOnPlane ( Vector3 normal )
-    {
-        Vector3 gravityVector = Vector3.down * gravity;
+    public static Vector3 gravityVector => Vector3.down * gravity;
 
+    // clave para pendientes
+    public static Vector3 ReturnGravityOnAngledSurface( Vector3 normal )
+    {
+        //ReturnGravityOnAngledSurface
         // quitar componente perpendicular > queda la paralela,
         // para que el objeto se quede pegado a la superficie, no se caiga ni se eleve
         // es decir la gravedad proyectada en el plano nos
