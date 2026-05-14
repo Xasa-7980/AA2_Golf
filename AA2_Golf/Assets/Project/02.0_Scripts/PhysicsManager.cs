@@ -31,7 +31,7 @@ public static class PhysicsManager
 
     public static Vector3 gravityVector => Vector3.down * gravity;
 
-    // clave para pendientes
+    //Necesario para pendientes
     public static Vector3 ReturnGravityOnAngledSurface( Vector3 normal )
     {
         //ReturnGravityOnAngledSurface
