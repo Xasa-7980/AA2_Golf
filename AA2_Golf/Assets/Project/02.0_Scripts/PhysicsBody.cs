@@ -1,5 +1,7 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using UnityEngine.UI;
 
 public enum PhysicsBodyType
 {
@@ -27,17 +29,32 @@ public class PhysicsBody : MonoBehaviour
     [Header("Win Condition")]
     public float maxWinSpeed = 0.5f;
 
+    [Header("Restart Conditions")]
+    public int maxWallBounces = 3;
+    public float fallThreshold = -10f;
+
+    [Header("UI Fade")]
+    public Image fadePanelImage;
+    public float fadeDuration = 0.5f;
+
     private SurfaceMaterial currentSurface;
     private Vector3 surfaceNormal = Vector3.up;
     private bool isGrounded = false;
 
+    private int wallBounceCount = 0;
+    private bool isRestarting = false;
+    //Guizmos
+    private Vector3 _lastProjectedForce = Vector3.zero;
+    private Vector3 _lastForceOrigin = Vector3.zero;
+
     void FixedUpdate()
     {
-        if (isStatic) return;
+        if (isStatic || isRestarting) return;
         DetectSurface();
         ApplyForces();
         Move();
         ClampVelocity();
+        CheckFallThreshold();
     }
 
     // Applies a force to the body. If grounded on an angled surface,
@@ -49,10 +66,16 @@ public class PhysicsBody : MonoBehaviour
             Vector3 projected = Vector3.ProjectOnPlane(force, surfaceNormal);
             Debug.Log($"Applied force: {force}, projected on surface: {projected}");
             velocity += projected;
+
+            _lastProjectedForce = projected;
+            _lastForceOrigin = transform.position;
         }
         else
         {
             velocity += force;
+
+            _lastProjectedForce = force;
+            _lastForceOrigin = transform.position;
         }
     }
 
@@ -78,7 +101,7 @@ public class PhysicsBody : MonoBehaviour
             float friction = PhysicsManager.CombineFriction(surfaceFriction, material.friction);
 
             Vector3 frictionForce = PhysicsManager.CalculateFriction(velocity, friction);
-            velocity += frictionForce * Time.fixedDeltaTime; // was Time.deltaTime — fixed
+            velocity += frictionForce * Time.fixedDeltaTime;
         }
 
         // AIRE — active only above y > 1m
@@ -107,6 +130,19 @@ public class PhysicsBody : MonoBehaviour
                     motion.normalized, out RaycastHit hit, motion.magnitude))
             {
                 if (CheckIfWin(hit)) return;
+
+                // Count wall bounces (surface steeper than 80 degrees so we have some margin)
+                if (Vector3.Angle(Vector3.up, hit.normal) > 80f)
+                {
+                    wallBounceCount++;
+                    Debug.Log($"Wall bounce #{wallBounceCount}");
+
+                    if (wallBounceCount >= maxWallBounces)
+                    {
+                        StartCoroutine(RestartWithFade());
+                        return;
+                    }
+                }
 
                 float bounciness = material != null ? material.bouncing : 0.5f;
 
@@ -137,6 +173,53 @@ public class PhysicsBody : MonoBehaviour
             float angularSpeed = velocity.magnitude / radius;
             transform.Rotate(axis, angularSpeed * Mathf.Rad2Deg * Time.fixedDeltaTime, Space.World);
         }
+    }
+
+    void CheckFallThreshold()
+    {
+        if (transform.position.y < fallThreshold)
+        {
+            StartCoroutine(RestartWithFade());
+        }
+    }
+
+    IEnumerator RestartWithFade()
+    {
+        if (isRestarting) yield break;
+        isRestarting = true;
+        velocity = Vector3.zero;
+
+        // Fade in
+        yield return StartCoroutine(FadePanel(0f, 1f));
+
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+
+        // Fade out 
+        yield return StartCoroutine(FadePanel(1f, 0f));
+
+        isRestarting = false;
+        wallBounceCount = 0;
+    }
+
+    IEnumerator FadePanel(float from, float to)
+    {
+        if (fadePanelImage == null) yield break;
+
+        fadePanelImage.gameObject.SetActive(true);
+        float elapsed = 0f;
+
+        while (elapsed < fadeDuration)
+        {
+            elapsed += Time.deltaTime;
+            float alpha = Mathf.Lerp(from, to, elapsed / fadeDuration);
+            fadePanelImage.color = new Color(0f, 0f, 0f, alpha);
+            yield return null;
+        }
+
+        fadePanelImage.color = new Color(0f, 0f, 0f, to);
+
+        if (to == 0f)
+            fadePanelImage.gameObject.SetActive(false);
     }
 
     bool CheckIfWin(RaycastHit hit)
@@ -190,5 +273,16 @@ public class PhysicsBody : MonoBehaviour
         {
             velocity = Vector3.zero;
         }
+    }
+
+    void OnDrawGizmos()
+    {
+        if (_lastProjectedForce == Vector3.zero) return;
+
+        float magnitude = _lastProjectedForce.magnitude;
+
+        Gizmos.color = Color.cyan;
+        Gizmos.DrawLine(_lastForceOrigin, _lastForceOrigin + _lastProjectedForce);
+        Gizmos.DrawSphere(_lastForceOrigin + _lastProjectedForce, magnitude * 0.05f);
     }
 }

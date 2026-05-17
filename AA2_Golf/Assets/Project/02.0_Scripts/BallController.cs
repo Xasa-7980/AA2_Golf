@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(LineRenderer))]
@@ -16,6 +17,12 @@ public class BallController : MonoBehaviour
     [Header("Velocity Arrow")]
     [SerializeField] private float arrowScale = 1f;
     private LineRenderer velocityArrow;
+
+    // Trajectory prediction
+    [Header("Trajectory Prediction")]
+    [SerializeField] private int trajectorySteps = 30;
+    [SerializeField] private float trajectoryTimeStep = 0.05f;
+    [SerializeField] private float trajectoryFriction = 0.4f; // fallback friction for preview
 
     void Start()
     {
@@ -81,7 +88,6 @@ public class BallController : MonoBehaviour
     {
         if (isDragging)
         {
-            // Arrow shows the launch direction, opposite to the drag line
             Vector3 currentWorldPos = GetMouseWorldPos();
             Vector3 previewForce = (dragStartWorldPos - currentWorldPos) * forceMultiplier;
             previewForce = Vector3.ClampMagnitude(previewForce, maxForce);
@@ -89,25 +95,93 @@ public class BallController : MonoBehaviour
 
             if (previewForce.magnitude > 0.05f)
             {
-                velocityArrow.positionCount = 2;
-                velocityArrow.SetPosition(0, transform.position);
-                velocityArrow.SetPosition(1, transform.position + previewForce * arrowScale);
+                // Project launch force onto the surface, matching PhysicsBody.AddForce
+                Vector3 startNormal = SampleSurfaceNormal(transform.position);
+                Vector3 initialVelocity = Vector3.ProjectOnPlane(previewForce, startNormal);
+
+                List<Vector3> points = SimulateTrajectory(transform.position, initialVelocity);
+                ApplyToLineRenderer(velocityArrow, points);
             }
             else
             {
                 velocityArrow.positionCount = 0;
             }
         }
-        else if (body.velocity.magnitude > 0.05f)
-        {
-            velocityArrow.positionCount = 2;
-            velocityArrow.SetPosition(0, transform.position);
-            velocityArrow.SetPosition(1, transform.position + body.velocity * arrowScale);
-        }
         else
         {
             velocityArrow.positionCount = 0;
         }
+    }
+
+    // Simulates the ball trajectory step-by-step
+    private List<Vector3> SimulateTrajectory(Vector3 startPos, Vector3 startVelocity)
+    {
+        List<Vector3> points = new List<Vector3>(trajectorySteps + 1);
+        Vector3 pos = startPos;
+        Vector3 vel = startVelocity;
+
+        points.Add(pos);
+
+        for (int i = 0; i < trajectorySteps; i++)
+        {
+            Vector3 normal = SampleSurfaceNormal(pos);
+            bool grounded = normal != Vector3.up || IsGroundedAt(pos);
+
+            if (grounded)
+            {
+                // Slope gravity projected onto surface plane
+                Vector3 gravityForce = PhysicsManager.ReturnGravityOnAngledSurface(normal);
+                vel += gravityForce * trajectoryTimeStep;
+
+                // Friction opposes motion
+                Vector3 frictionForce = PhysicsManager.CalculateFriction(vel, trajectoryFriction);
+                vel += frictionForce * trajectoryTimeStep;
+            }
+            else
+            {
+                vel += Vector3.down * PhysicsManager.gravity * trajectoryTimeStep;
+            }
+
+            pos += vel * trajectoryTimeStep;
+
+            // Snap to surface so the line hugs the terrain
+            pos = SnapToSurface(pos, body.radius);
+
+            points.Add(pos);
+
+            // Stop early if ball would halt
+            if (vel.magnitude < 0.05f)
+                break;
+        }
+
+        return points;
+    }
+
+    // Returns the surface normal below the given position, or Vector3.up if none found.
+    private Vector3 SampleSurfaceNormal(Vector3 pos)
+    {
+        if (Physics.Raycast(pos, Vector3.down, out RaycastHit hit, body.radius + 0.3f))
+            return hit.normal;
+        return Vector3.up;
+    }
+
+    private bool IsGroundedAt(Vector3 pos)
+    {
+        return Physics.Raycast(pos, Vector3.down, body.radius + 0.15f);
+    }
+
+    private Vector3 SnapToSurface(Vector3 pos, float radius)
+    {
+        if (Physics.Raycast(pos + Vector3.up * 0.5f, Vector3.down, out RaycastHit hit, radius + 0.8f))
+            return hit.point + hit.normal * radius;
+        return pos;
+    }
+
+    private static void ApplyToLineRenderer(LineRenderer lr, List<Vector3> points)
+    {
+        lr.positionCount = points.Count;
+        for (int i = 0; i < points.Count; i++)
+            lr.SetPosition(i, points[i]);
     }
 
     // Projects the mouse onto the XZ plane (y = ball height)
