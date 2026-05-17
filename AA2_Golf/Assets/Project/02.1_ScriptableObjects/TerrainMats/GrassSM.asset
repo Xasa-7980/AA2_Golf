@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fc29b5c6aa13e914bb36d8cd1660cd98, type: 3}
   m_Name: GrassSM
   m_EditorClassIdentifier: 
-  friction: 0.4
+  friction: 0.5
   bouncing: 0.3
