@@ -1,4 +1,5 @@
 using System.Collections;
+using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
@@ -33,9 +34,11 @@ public class PhysicsBody : MonoBehaviour
     public int maxWallBounces = 3;
     public float fallThreshold = -10f;
 
-    [Header("UI Fade")]
+    [Header("UI")]
     public Image fadePanelImage;
     public float fadeDuration = 0.5f;
+    public TMP_Text bouncetext;
+
 
     private SurfaceMaterial currentSurface;
     private Vector3 surfaceNormal = Vector3.up;
@@ -135,6 +138,7 @@ public class PhysicsBody : MonoBehaviour
                 if (Vector3.Angle(Vector3.up, hit.normal) > 80f)
                 {
                     wallBounceCount++;
+                    bouncetext.text = "Bounces: " + (wallBounceCount);
                     Debug.Log($"Wall bounce #{wallBounceCount}");
 
                     if (wallBounceCount >= maxWallBounces)
