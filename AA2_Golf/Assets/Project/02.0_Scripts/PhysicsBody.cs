@@ -1,4 +1,4 @@
-using System.Collections;
+﻿using System.Collections;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -88,16 +88,19 @@ public class PhysicsBody : MonoBehaviour
         if (isGrounded)
         {
             // pendiente
-            Vector3 gravityForce = PhysicsManager.ReturnGravityOnAngledSurface(surfaceNormal);
-            velocity += gravityForce * Time.fixedDeltaTime;
+            Vector3 gravityOnProjection = PhysicsManager.ReturnGravityOnAngledSurface(surfaceNormal);
+            
+            // v = v + aΔt
+            velocity += gravityOnProjection * Time.fixedDeltaTime;
         }
         else
         {
-            // ca�da libre
+            // caída libre
+            // v = v + gΔt
             velocity += Vector3.down * PhysicsManager.gravity * Time.fixedDeltaTime;
         }
 
-        // FRICCI�N (solo en suelo)
+        // FRICCIÓN (solo en suelo)
         if (isGrounded)
         {
             float surfaceFriction = currentSurface != null ? currentSurface.friction : 0.4f;
@@ -107,7 +110,7 @@ public class PhysicsBody : MonoBehaviour
             velocity += frictionForce * Time.fixedDeltaTime;
         }
 
-        // AIRE � active only above y > 1m
+        // AIRE — active only above y > 1m
         if (!isGrounded && transform.position.y > 1f)
         {
             Vector3 air = PhysicsManager.CalculateAirResistance(
@@ -117,12 +120,14 @@ public class PhysicsBody : MonoBehaviour
                 area
             );
 
+            // v = v + aΔt
             velocity += air * Time.fixedDeltaTime;
         }
     }
 
     void Move()
     {
+        // Δx = vΔt
         Vector3 motion = velocity * Time.fixedDeltaTime;
 
         if (motion.magnitude > 0.001f)
@@ -135,6 +140,8 @@ public class PhysicsBody : MonoBehaviour
                 if (CheckIfWin(hit)) return;
 
                 // Count wall bounces (surface steeper than 80 degrees so we have some margin)
+
+                // θ = cos⁻¹((A·B)/|A||B|)
                 if (Vector3.Angle(Vector3.up, hit.normal) > 80f)
                 {
                     wallBounceCount++;
@@ -155,26 +162,33 @@ public class PhysicsBody : MonoBehaviour
                     bounciness = PhysicsManager.CombineBounce(surface.material.bouncing, material.bouncing);
                 }
 
+                // R = V - 2(V·N)N
                 velocity = Vector3.Reflect(velocity, hit.normal) * bounciness;
 
                 float distanceToHit = Mathf.Max(0f, hit.distance - 0.001f);
                 transform.position += motion.normalized * distanceToHit;
                 transform.position += hit.normal * 0.002f;
 
+                // t_remaining = Δt - (distance / speed)
                 float remainingTime = Time.fixedDeltaTime - (distanceToHit / (motion.magnitude / Time.fixedDeltaTime + Mathf.Epsilon));
+
+                // Δx = vΔt
                 transform.position += velocity * remainingTime;
             }
             else
             {
+                // x = x + vΔt
                 transform.position += motion;
             }
         }
 
-        // Rotaci�n: W = v / r
         if (velocity.magnitude > 0.01f && isGrounded)
         {
+            // A × B = vector perpendicular a ambos
             Vector3 axis = Vector3.Cross(Vector3.up, velocity.normalized);
+            // ω = v / r
             float angularSpeed = velocity.magnitude / radius;
+            // θ = ωt
             transform.Rotate(axis, angularSpeed * Mathf.Rad2Deg * Time.fixedDeltaTime, Space.World);
         }
     }
