@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: RubberSM
   m_EditorClassIdentifier: 
   friction: 0.35
-  bouncing: 0.55
+  bouncing: 0.2

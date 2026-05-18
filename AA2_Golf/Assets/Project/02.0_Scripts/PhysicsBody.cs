@@ -247,6 +247,11 @@ public class PhysicsBody : MonoBehaviour
         if (velocity.magnitude < maxWinSpeed)
         {
             int nextIndex = SceneManager.GetActiveScene().buildIndex + 1;
+            if (nextIndex >= SceneManager.sceneCountInBuildSettings)
+            {
+                LevelLoader.Instance.LoadLevelByIndex(0);
+                return true;
+            }
             LevelLoader.Instance.LoadLevelByIndex(nextIndex);
             return true;
         }
